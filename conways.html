@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Conway's Game of Life</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single:wght@100..900&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  /* Landing Page Styles */
+  .landing-page {
+    font-family: 'Space Grotesk', sans-serif;
+    background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .landing-page.hidden {
+    display: none;
+  }
+
+  /* Animated background grid with glowing squares */
+  .bg-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 20px);
+    grid-template-rows: repeat(auto-fill, 20px);
+    gap: 1px;
+    z-index: 1;
+  }
+
+  .bg-grid-square {
+    width: 20px;
+    height: 20px;
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.5s ease;
+  }
+
+  .bg-grid-square.glow {
+    background-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 
+      0 0 10px rgba(255, 255, 255, 0.8),
+      0 0 20px rgba(255, 255, 255, 0.6),
+      0 0 30px rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.8);
+  }
+
+  .main-content {
+    text-align: center;
+    z-index: 10;
+    position: relative;
+  }
+
+  .title {
+    font-family: 'Bitcount Prop Single', monospace;
+    font-size: clamp(3rem, 8vw, 6rem);
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 1rem;
+    letter-spacing: 2px;
+    animation: titleGlow 2s ease-in-out infinite alternate;
+  }
+
+  @keyframes titleGlow {
+    0% { text-shadow: 0 0 20px rgba(255, 255, 255, 0.3); }
+    100% { text-shadow: 0 0 30px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.2); }
+  }
+
+  .subtitle {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1rem, 3vw, 1.5rem);
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 3rem;
+    font-weight: 300;
+    letter-spacing: 1px;
+  }
+
+  .play-button {
+    font-family: 'Space Grotesk', sans-serif;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50px;
+    padding: 20px 60px;
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 1.5rem;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    animation: pulse 2s infinite;
+  }
+
+  .play-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+  }
+
+  .play-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(255, 255, 255, 0.1);
+  }
+
+  .play-button:hover::before {
+    left: 100%;
+  }
+
+  .play-button:active {
+    transform: translateY(0);
+  }
+
+  .footer {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Space Grotesk', sans-serif;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+    font-weight: 300;
+    letter-spacing: 1px;
+    z-index: 10;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+  }
+
+  /* Game Page Styles */
+  .game-page {
+    display: none;
+    font-family: 'Space Grotesk', sans-serif;
+    background: linear-gradient(135deg, #000000 0%, #000000 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .game-page.active {
+    display: block;
+  }
+
+  .container {
+    display: flex;
+    height: 100vh;
+  }
+
+  /* Glassy Minimalist Side Panel */
+  .side-panel {
+    width: 280px;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 100;
+  }
+
+  .panel-header {
+    margin-bottom: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-title {
+    font-family: 'Bitcount Prop Single', monospace;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+
+  .back-button {
+    font-family: 'Space Grotesk', sans-serif;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 12px;
+    font-weight: 300;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .back-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .control-label {
+    font-family: 'Space Grotesk', sans-serif;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .glass-button {
+    font-family: 'Space Grotesk', sans-serif;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 12px 20px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 300;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .glass-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .glass-button:active {
+    transform: translateY(0);
+  }
+
+  .glass-input {
+    font-family: 'Space Grotesk', sans-serif;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .glass-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .glass-input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  /* Main Content Area */
+  .main-game-content {
+    flex: 1;
+    margin-left: 280px;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .game-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .grid {
+    display: grid;
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  .cell {
+    width: 12px;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .cell.alive {
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  }
+
+  .stats {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .stat-item {
+    font-family: 'Space Grotesk', sans-serif;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+    font-weight: 300;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .title {
+      margin-bottom: 0.5rem;
+    }
+    
+    .subtitle {
+      margin-bottom: 2rem;
+    }
+    
+    .play-button {
+      padding: 15px 40px;
+      font-size: 1.2rem;
+    }
+    
+    .footer {
+      bottom: 1rem;
+      font-size: 0.8rem;
+    }
+
+    .side-panel {
+      width: 100%;
+      height: auto;
+      position: relative;
+    }
+    
+    .main-game-content {
+      margin-left: 0;
+    }
+  }
+</style>
+</head>
+<body>
+  <!-- Landing Page -->
+  <div class="landing-page" id="landingPage">
+    <!-- Animated background grid -->
+    <div class="bg-grid" id="bgGrid"></div>
+    
+    <!-- Main content -->
+    <div class="main-content">
+      <h1 class="title">Conway's<br>Game of Life</h1>
+      <p class="subtitle">Experience the beauty of cellular evolution</p>
+      <button class="play-button" onclick="startGame()">Play</button>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+      Built by Aditya Panda & Ankit Chetri
+    </div>
+  </div>
+
+  <!-- Game Page -->
+  <div class="game-page" id="gamePage">
+    <div class="container">
+      <!-- Glassy Minimalist Side Panel -->
+      <div class="side-panel">
+        <div class="panel-header">
+          <h1 class="panel-title">Conway's Game of Life</h1>
+          <button class="back-button" onclick="goBackToLanding()">← Back</button>
+        </div>
+        
+        <div class="controls">
+          <div class="control-group">
+            <label class="control-label">Simulation</label>
+            <button class="glass-button" id="startBtn">Start</button>
+            <button class="glass-button" id="pauseBtn">Pause</button>
+            <button class="glass-button" id="resetBtn">Reset</button>
+            <button class="glass-button" id="randomBtn">Random</button>
+          </div>
+          
+          <div class="control-group">
+            <label class="control-label">Speed</label>
+            <input type="range" class="glass-input" id="speedSlider" min="1" max="20" value="5">
+          </div>
+          
+          <div class="control-group">
+            <label class="control-label">Grid Size (Max. 50)</label>
+            <input type="number" class="glass-input" id="gridSize" value="30" min="10" max="50">
+            <button class="glass-button" id="resizeBtn">Apply</button>
+          </div>
+        </div>
+        
+        <div class="stats">
+          <div class="stat-item">
+            <span>Population:</span>
+            <span id="population">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="main-game-content">
+        <div class="game-container">
+          <div class="grid" id="gameGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let game; // Game instance
+
+    // Background grid functionality
+    function createBgGrid() {
+      const grid = document.getElementById('bgGrid');
+      grid.innerHTML = '';
+      
+      // Calculate number of columns and rows based on viewport
+      const cols = Math.ceil(window.innerWidth / 21); // 20px + 1px gap
+      const rows = Math.ceil(window.innerHeight / 21);
+      
+      for (let i = 0; i < cols * rows; i++) {
+        const square = document.createElement('div');
+        square.classList.add('bg-grid-square');
+        grid.appendChild(square);
+      }
+    }
+
+    // Animate glowing squares randomly
+    function animateGlowSquares() {
+      const squares = document.querySelectorAll('.bg-grid-square');
+      
+      setInterval(() => {
+        // Remove glow from all squares
+        squares.forEach(sq => sq.classList.remove('glow'));
+        
+        // Randomly pick 8-12 squares to glow
+        const numGlowing = Math.floor(Math.random() * 5) + 8; // 8-12 squares
+        const glowingIndices = new Set();
+        
+        while (glowingIndices.size < numGlowing) {
+          const idx = Math.floor(Math.random() * squares.length);
+          glowingIndices.add(idx);
+        }
+        
+        glowingIndices.forEach(idx => {
+          squares[idx].classList.add('glow');
+        });
+      }, 1200); // Change every 1.2 seconds
+    }
+
+    // Initialize the background grid and animation
+    function initBgGrid() {
+      createBgGrid();
+      animateGlowSquares();
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', createBgGrid);
+    window.addEventListener('load', initBgGrid);
+
+    // Navigation functions
+    function startGame() {
+      document.getElementById('landingPage').classList.add('hidden');
+      document.getElementById('gamePage').classList.add('active');
+      
+      // Initialize the game
+      if (!game) {
+        game = new GameOfLife(30);
+      }
+    }
+
+    function goBackToLanding() {
+      // Pause the game if running
+      if (game && game.running) {
+        game.pause();
+      }
+      
+      document.getElementById('landingPage').classList.remove('hidden');
+      document.getElementById('gamePage').classList.remove('active');
+    }
+
+    // Conway's Game of Life JavaScript implementation
+    class GameOfLife {
+      constructor(size = 30) {
+        this.size = size;
+        this.grid = this.createEmptyGrid();
+        this.running = false;
+        this.generation = 0;
+        this.intervalId = null;
+        this.speed = 200; // Default speed in milliseconds
+        
+        this.initializeDOM();
+        this.bindEvents();
+        this.render();
+      }
+      
+      createEmptyGrid() {
+        return Array(this.size).fill().map(() => Array(this.size).fill(false));
+      }
+      
+      initializeDOM() {
+        const gameGrid = document.getElementById('gameGrid');
+        gameGrid.style.gridTemplateColumns = `repeat(${this.size}, 1fr)`;
+        gameGrid.innerHTML = '';
+        
+        for (let i = 0; i < this.size; i++) {
+          for (let j = 0; j < this.size; j++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.row = i;
+            cell.dataset.col = j;
+            cell.addEventListener('click', () => this.toggleCell(i, j));
+            gameGrid.appendChild(cell);
+          }
+        }
+      }
+      
+      bindEvents() {
+        document.getElementById('startBtn').addEventListener('click', () => this.start());
+        document.getElementById('pauseBtn').addEventListener('click', () => this.pause());
+        document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+        document.getElementById('randomBtn').addEventListener('click', () => this.randomize());
+        document.getElementById('resizeBtn').addEventListener('click', () => this.resize());
+        document.getElementById('speedSlider').addEventListener('input', (e) => {
+          // Convert slider value to speed: higher slider value = faster speed (lower delay)
+          const sliderValue = parseInt(e.target.value);
+          this.speed = 1100 - (sliderValue * 50); 
+          if (this.running) {
+            this.pause();
+            this.start();
+          }
+        });
+      }
+      
+      toggleCell(row, col) {
+        this.grid[row][col] = !this.grid[row][col];
+        this.render();
+      }
+      
+      start() {
+        if (!this.running) {
+          this.running = true;
+          this.intervalId = setInterval(() => this.nextGeneration(), this.speed);
+        }
+      }
+      
+      pause() {
+        this.running = false;
+        if (this.intervalId) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+        }
+      }
+      
+      reset() {
+        this.pause();
+        this.grid = this.createEmptyGrid();
+        this.generation = 0;
+        this.render();
+      }
+      
+      randomize() {
+        this.pause();
+        this.grid = this.grid.map(row => 
+          row.map(() => Math.random() < 0.3)
+        );
+        this.generation = 0;
+        this.render();
+      }
+      
+      resize() {
+        const newSize = parseInt(document.getElementById('gridSize').value);
+        this.size = Math.max(10, Math.min(50, newSize));
+        this.pause();
+        this.grid = this.createEmptyGrid();
+        this.generation = 0;
+        this.initializeDOM();
+        this.render();
+      }
+      
+      countNeighbors(row, col) {
+        let count = 0;
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            if (i === 0 && j === 0) continue;
+            const newRow = (row + i + this.size) % this.size;
+            const newCol = (col + j + this.size) % this.size;
+            if (this.grid[newRow][newCol]) count++;
+          }
+        }
+        return count;
+      }
+      
+      nextGeneration() {
+        const newGrid = this.grid.map((row, i) =>
+          row.map((cell, j) => {
+            const neighbors = this.countNeighbors(i, j);
+            if (cell) {
+              return neighbors === 2 || neighbors === 3;
+            } else {
+              return neighbors === 3;
+            }
+          })
+        );
+        
+        this.grid = newGrid;
+        this.generation++;
+        this.render();
+      }
+      
+      render() {
+        const cells = document.querySelectorAll('.cell');
+        let population = 0;
+        
+        cells.forEach((cell, index) => {
+          const row = Math.floor(index / this.size);
+          const col = index % this.size;
+          const isAlive = this.grid[row][col];
+          
+          cell.classList.toggle('alive', isAlive);
+          if (isAlive) population++;
+        });
+        
+        // Fix: Make sure the population element exists and update it
+        const populationElement = document.getElementById('population');
+        if (populationElement) {
+          populationElement.textContent = population;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
